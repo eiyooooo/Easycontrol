@@ -1,5 +1,9 @@
 package top.saymzx.easycontrol.app.entity;
 
+import android.util.Pair;
+
+import java.io.File;
+
 public final class MyInterface {
   public interface MyFunction {
     void run();

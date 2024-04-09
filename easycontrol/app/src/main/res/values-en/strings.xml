@@ -6,8 +6,6 @@
 
   <!-- 主页 -->
   <string name="main_poem">Light up with pleasure</string>
-  <string name="main_float_permission">Please grant floating window permission, otherwise the software cannot be used.</string>
-  <string name="main_float_permission_button">Go to setting</string>
   <string name="main_scan_device_local">Local</string>
   <string name="main_device_type_network">Wireless</string>
   <string name="main_device_type_link">Wired</string>
@@ -103,7 +101,7 @@
   <string name="set_device_title">Details</string>
   <string name="set_device_button_change">Settings</string>
   <string name="set_device_button_start_wireless">Enable wireless</string>
-  <string name="set_device_buttons_send">Send</string>
+  <string name="set_device_buttons_file">File</string>
   <string name="set_device_button_recover">Recover</string>
   <string name="set_device_button_delete">Delete</string>
 
@@ -115,6 +113,8 @@
   <string name="toast_copy">Copied</string>
   <string name="toast_success">Success</string>
   <string name="toast_fail">Fail</string>
+  <string name="toast_float_per">Need floating window permission</string>
+  <string name="toast_storage_per">Need manage storage permission</string>
   <string name="toast_config">Fill in the mismatch</string>
   <string name="toast_no_browser">No default browser</string>
   <string name="toast_address_error">Address format error</string>

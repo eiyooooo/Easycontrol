@@ -24,4 +24,4 @@
 }
 -keep class android.content.IOnPrimaryClipChangedListener{*;}
 -keep class android.view.IRotationWatcher{*;}
--keep class top.saymzx.easycontrol.server.helper.FakeContext{*;}
+-keep class top.saymzx.easycontrol.server.tools.FakeContext{*;}

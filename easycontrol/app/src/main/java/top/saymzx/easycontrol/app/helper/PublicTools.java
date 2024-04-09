@@ -38,49 +38,6 @@ public class PublicTools {
     return (int) (dp * getScreenSize().density);
   }
 
-  // 分离地址和端口号
-  public static Pair<String, Integer> getIpAndPort(String address) throws IOException {
-    // 如果包含应用名，则需要要分割出地址
-    if (address.contains("#")) address = address.split("#")[0];
-    String pattern;
-    int type;
-    // 特殊格式
-    if (address.contains("*")) {
-      type = 2;
-      pattern = "(\\*.*?\\*.*):(\\d+)";
-    }
-    // IPv6
-    else if (address.contains("[")) {
-      type = 6;
-      pattern = "(\\[.*?]):(\\d+)";
-    }
-    // 域名
-    else if (Pattern.matches(".*[a-zA-Z].*", address)) {
-      type = 1;
-      pattern = "(.*?):(\\d+)";
-    }
-    // IPv4
-    else {
-      type = 4;
-      pattern = "(.*?):(\\d+)";
-    }
-    Matcher matcher = Pattern.compile(pattern).matcher(address);
-    if (!matcher.find()) throw new IOException(AppData.applicationContext.getString(R.string.toast_address_error));
-    String ip = matcher.group(1);
-    String port = matcher.group(2);
-    if (ip == null || port == null) throw new IOException(AppData.applicationContext.getString(R.string.toast_address_error));
-    // 特殊格式
-    if (type == 2) {
-      if (ip.equals("*gateway*")) ip = getGateway();
-      if (ip.contains("*netAddress*")) ip = ip.replace("*netAddress*", getNetAddress());
-    }
-    // 域名解析
-    else if (type == 1) {
-      ip = InetAddress.getByName(ip).getHostAddress();
-    }
-    return new Pair<>(ip, Integer.parseInt(port));
-  }
-
   // 获取IP地址
   public static Pair<ArrayList<String>, ArrayList<String>> getIp() {
     ArrayList<String> ipv4Addresses = new ArrayList<>();
@@ -101,43 +58,6 @@ public class PublicTools {
     } catch (Exception ignored) {
     }
     return new Pair<>(ipv4Addresses, ipv6Addresses);
-  }
-
-  // 获取网关地址
-  public static String getGateway() {
-    int ip = AppData.wifiManager.getDhcpInfo().gateway;
-    // 没有wifi时，设置为1.1.1.1
-    if (ip == 0) ip = 16843009;
-    return decodeIntToIp(ip, 4);
-  }
-
-  // 获取子网地址
-  public static String getNetAddress() {
-    int ip = AppData.wifiManager.getDhcpInfo().gateway;
-    // 没有wifi时，设置为1.1.1.1
-    if (ip == 0) ip = 16843009;
-    // 因为此标识符使用场景有限，为了节省资源，默认地址为24位掩码地址
-    return decodeIntToIp(ip, 3);
-  }
-
-  // 解析地址
-  private static String decodeIntToIp(int ip, int len) {
-    if (len < 1 || len > 4) return "";
-    StringBuilder builder = new StringBuilder();
-    builder.append(ip & 0xff);
-    if (len > 1) {
-      builder.append(".");
-      builder.append((ip >> 8) & 0xff);
-      if (len > 2) {
-        builder.append(".");
-        builder.append((ip >> 16) & 0xff);
-        if (len > 3) {
-          builder.append(".");
-          builder.append((ip >> 24) & 0xff);
-        }
-      }
-    }
-    return builder.toString();
   }
 
   // 浏览器打开

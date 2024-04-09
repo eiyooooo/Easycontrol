@@ -4,24 +4,25 @@
 package top.saymzx.easycontrol.server;
 
 import android.annotation.SuppressLint;
+import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.IBinder;
 import android.os.IInterface;
 
-import java.io.DataInputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.ServerSocket;
-import java.net.Socket;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
+import java.util.HashMap;
 
-import top.saymzx.easycontrol.server.entity.Device;
-import top.saymzx.easycontrol.server.entity.Options;
-import top.saymzx.easycontrol.server.helper.AudioEncode;
-import top.saymzx.easycontrol.server.helper.ControlPacket;
-import top.saymzx.easycontrol.server.helper.VideoEncode;
+import top.saymzx.easycontrol.server.encode.AudioEncode;
+import top.saymzx.easycontrol.server.encode.VideoEncode;
+import top.saymzx.easycontrol.server.tools.ControlPacket;
+import top.saymzx.easycontrol.server.tools.DeviceTool;
+import top.saymzx.easycontrol.server.tools.FileTool;
+import top.saymzx.easycontrol.server.tools.Stream;
+import top.saymzx.easycontrol.server.tools.TcpStream;
 import top.saymzx.easycontrol.server.wrappers.ClipboardManager;
 import top.saymzx.easycontrol.server.wrappers.DisplayManager;
 import top.saymzx.easycontrol.server.wrappers.InputManager;
@@ -30,57 +31,34 @@ import top.saymzx.easycontrol.server.wrappers.WindowManager;
 
 // 此部分代码摘抄借鉴了著名投屏软件Scrcpy的开源代码(https://github.com/Genymobile/scrcpy/tree/master/server)
 public final class Server {
-  private static Socket mainSocket;
-  private static Socket videoSocket;
-  private static OutputStream mainOutputStream;
-  private static OutputStream videoOutputStream;
-  public static DataInputStream mainInputStream;
+  private static boolean isClosed = false;
+  // 组件
+  private static Stream stream;
+  private static ControlPacket controlPacket;
+  private static final HashMap<Integer, VideoEncode> videoEncodes = new HashMap<>();
+  private static final HashMap<Integer, AudioEncode> audioEncodes = new HashMap<>();
+  private static DeviceTool deviceTool;
+  private static FileTool fileTool;
 
-  private static final Object object = new Object();
-
-  private static final int timeoutDelay = 1000 * 5;
+  private static final HandlerThread mainHandlerThread = new HandlerThread("easycontrol_main");
+  public static Handler mainHandler;
 
   public static void main(String... args) {
+    mainHandlerThread.start();
+    mainHandler = new Handler(mainHandlerThread.getLooper());
+    int serverPort = Integer.parseInt(args[0]);
     try {
-      Thread timeOutThread = new Thread(() -> {
-        try {
-          Thread.sleep(timeoutDelay);
-          release();
-        } catch (InterruptedException ignored) {
-        }
-      });
-      timeOutThread.start();
-      // 解析参数
-      Options.parse(args);
       // 初始化
       setManagers();
-      Device.init();
       // 连接
-      connectClient();
-      // 初始化子服务
-      boolean canAudio = AudioEncode.init();
-      VideoEncode.init();
-      // 启动
-      ArrayList<Thread> threads = new ArrayList<>();
-      threads.add(new Thread(Server::executeVideoOut));
-      if (canAudio) {
-        threads.add(new Thread(Server::executeAudioIn));
-        threads.add(new Thread(Server::executeAudioOut));
-      }
-      threads.add(new Thread(Server::executeControlIn));
-      for (Thread thread : threads) thread.setPriority(Thread.MAX_PRIORITY);
-      for (Thread thread : threads) thread.start();
-      // 程序运行
-      timeOutThread.interrupt();
-      synchronized (object) {
-        object.wait();
-      }
-      // 终止子服务
-      for (Thread thread : threads) thread.interrupt();
+      stream = connectClient(serverPort);
+      controlPacket = new ControlPacket(stream);
+      // 连接检测
+      lastKeepAliveTime = System.currentTimeMillis();
+      mainHandler.postDelayed(Server::checkKeepAlive, 2000);
+      // 主程序
+      mainService();
     } catch (Exception e) {
-      e.printStackTrace();
-    } finally {
-      // 释放资源
       release();
     }
   }
@@ -118,128 +96,62 @@ public final class Server {
     }
   }
 
-  private static void connectClient() throws IOException {
-    try (ServerSocket serverSocket = new ServerSocket(25166)) {
-      mainSocket = serverSocket.accept();
-      videoSocket = serverSocket.accept();
-      mainOutputStream = mainSocket.getOutputStream();
-      videoOutputStream = videoSocket.getOutputStream();
-      mainInputStream = new DataInputStream(mainSocket.getInputStream());
+  private static Stream connectClient(int serverPort) throws IOException {
+    try (ServerSocket serverSocket = new ServerSocket(serverPort)) {
+      serverSocket.setSoTimeout(1000 * 5);
+      return new TcpStream(serverSocket.accept());
     }
   }
 
-  private static void executeVideoOut() {
-    try {
-      int frame = 0;
-      while (!Thread.interrupted()) {
-        if (VideoEncode.isHasChangeConfig) {
-          VideoEncode.isHasChangeConfig = false;
-          VideoEncode.stopEncode();
-          VideoEncode.startEncode();
+  private static long lastKeepAliveTime;
+
+  private static void checkKeepAlive() {
+    if (System.currentTimeMillis() - lastKeepAliveTime > 6000) release();
+  }
+
+  private static void mainService() throws IOException, InterruptedException {
+    while (!Thread.interrupted()) {
+      int mode = stream.readInt();
+      ByteBuffer data = stream.readByteArray(stream.readInt());
+      if (mode == ControlPacket.KEEPALIVE_EVENT) lastKeepAliveTime = System.currentTimeMillis();
+      else if (mode == ControlPacket.VIDEO_EVENT) {
+        int videoEncodeId = stream.readInt();
+        VideoEncode videoEncode = videoEncodes.get(videoEncodeId);
+        if (videoEncode == null || videoEncode.isClosed()) {
+          videoEncode = new VideoEncode(mainHandler, controlPacket);
+          videoEncodes.put(videoEncodeId, videoEncode);
         }
-        VideoEncode.encodeOut();
-        frame++;
-        if (frame > 120) {
-          if (System.currentTimeMillis() - lastKeepAliveTime > timeoutDelay) throw new IOException("连接断开");
-          frame = 0;
+        videoEncode.handle(data);
+      } else if (mode == ControlPacket.AUDIO_EVENT) {
+        int auidoEncodeId = stream.readInt();
+        AudioEncode audioEncode = audioEncodes.get(auidoEncodeId);
+        if (audioEncode == null || audioEncode.isClosed()) {
+          audioEncode = new AudioEncode(mainHandler, controlPacket);
+          audioEncodes.put(auidoEncodeId, audioEncode);
         }
+        audioEncode.handle(data);
+      } else if (mode == ControlPacket.FILE_EVENT) {
+        if (fileTool == null || fileTool.isClosed()) fileTool = new FileTool(controlPacket);
+        fileTool.handle(data);
+      } else if (mode == ControlPacket.DEVICE_EVENT) {
+        if (deviceTool == null || deviceTool.isClosed()) deviceTool = new DeviceTool(controlPacket);
+        deviceTool.handle(data);
       }
-    } catch (Exception e) {
-      errorClose(e);
     }
   }
 
-  private static void executeAudioIn() {
-    while (!Thread.interrupted()) AudioEncode.encodeIn();
-  }
-
-  private static void executeAudioOut() {
-    try {
-      while (!Thread.interrupted()) AudioEncode.encodeOut();
-    } catch (Exception e) {
-      errorClose(e);
-    }
-  }
-
-  private static long lastKeepAliveTime = System.currentTimeMillis();
-
-  private static void executeControlIn() {
-    try {
-      while (!Thread.interrupted()) {
-        switch (Server.mainInputStream.readByte()) {
-          case 1:
-            ControlPacket.handleTouchEvent();
-            break;
-          case 2:
-            ControlPacket.handleKeyEvent();
-            break;
-          case 3:
-            ControlPacket.handleClipboardEvent();
-            break;
-          case 4:
-            lastKeepAliveTime = System.currentTimeMillis();
-            break;
-          case 5:
-            Device.changeResolution(mainInputStream.readFloat());
-            break;
-          case 6:
-            Device.rotateDevice();
-            break;
-          case 7:
-            Device.changeScreenPowerMode(mainInputStream.readByte());
-            break;
-          case 8:
-            Device.changePower(mainInputStream.readInt());
-            break;
-          case 9:
-            Device.changeResolution(mainInputStream.readInt(), mainInputStream.readInt());
-            break;
-        }
-      }
-    } catch (Exception e) {
-      errorClose(e);
-    }
-  }
-
-  public synchronized static void writeMain(ByteBuffer byteBuffer) throws IOException {
-    mainOutputStream.write(byteBuffer.array());
-  }
-
-  public static void writeVideo(ByteBuffer byteBuffer) throws IOException {
-    videoOutputStream.write(byteBuffer.array());
-  }
-
-  public static void errorClose(Exception e) {
-    e.printStackTrace();
-    synchronized (object) {
-      object.notify();
-    }
-  }
-
-  // 释放资源
   private static void release() {
-    for (int i = 0; i < 4; i++) {
-      try {
-        switch (i) {
-          case 0:
-            mainInputStream.close();
-            mainSocket.close();
-            videoSocket.close();
-            break;
-          case 1:
-            VideoEncode.release();
-            AudioEncode.release();
-            break;
-          case 2:
-            Device.fallbackResolution();
-            Device.fallbackScreenLightTimeout();
-          case 3:
-            Runtime.getRuntime().exit(0);
-            break;
-        }
-      } catch (Exception ignored) {
-      }
-    }
+    if (isClosed) return;
+    isClosed = true;
+    // 关闭组件
+    mainHandlerThread.quit();
+    for (VideoEncode videoEncode : videoEncodes.values()) videoEncode.release(null);
+    for (AudioEncode audioEncode : audioEncodes.values()) audioEncode.release(null);
+    if (fileTool != null) fileTool.release(null);
+    if (deviceTool != null) deviceTool.release(null);
+    if (stream != null) stream.close();
+    // 更新数据库
+    Runtime.getRuntime().exit(0);
   }
 
 }

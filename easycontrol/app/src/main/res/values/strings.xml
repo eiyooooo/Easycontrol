@@ -6,8 +6,6 @@
 
   <!-- 主页 -->
   <string name="main_poem">慈恩塔下题名处，十七人中最少年</string>
-  <string name="main_float_permission">请授予悬浮窗权限，否则软件无法使用</string>
-  <string name="main_float_permission_button">前往设置</string>
   <string name="main_scan_device_local">本机</string>
   <string name="main_device_type_network">无线连接</string>
   <string name="main_device_type_link">有线连接</string>
@@ -104,7 +102,7 @@
   <string name="set_device_title">干什么◔ ‸◔?</string>
   <string name="set_device_button_change">修改</string>
   <string name="set_device_button_start_wireless">打开无线</string>
-  <string name="set_device_buttons_send">发送</string>
+  <string name="set_device_buttons_file">文件</string>
   <string name="set_device_button_recover">恢复</string>
   <string name="set_device_button_delete">删除</string>
 
@@ -116,6 +114,8 @@
   <string name="toast_copy">已复制</string>
   <string name="toast_success">成功</string>
   <string name="toast_fail">失败</string>
+  <string name="toast_float_per">需要悬浮窗权限</string>
+  <string name="toast_storage_per">需要文件读写权限</string>
   <string name="toast_config">填写错误</string>
   <string name="toast_no_browser">没有默认浏览器</string>
   <string name="toast_address_error">地址格式错误</string>

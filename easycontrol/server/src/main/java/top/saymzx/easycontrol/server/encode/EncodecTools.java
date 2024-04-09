@@ -1,4 +1,4 @@
-package top.saymzx.easycontrol.server.helper;
+package top.saymzx.easycontrol.server.encode;
 
 import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;

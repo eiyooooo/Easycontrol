@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
   <dimen name="cron">14dp</dimen>
+  <dimen name="cron_small">8dp</dimen>
   <dimen name="round">50dp</dimen>
   <!--字体-->
   <dimen name="largeFont">26sp</dimen>

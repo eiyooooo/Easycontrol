@@ -4,8 +4,6 @@ import android.app.Activity;
 import android.app.Dialog;
 import android.os.Bundle;
 import android.util.Pair;
-import android.view.View;
-import android.view.WindowManager;
 
 import top.saymzx.easycontrol.app.databinding.ActivityActiveBinding;
 import top.saymzx.easycontrol.app.databinding.ItemLoadingBinding;

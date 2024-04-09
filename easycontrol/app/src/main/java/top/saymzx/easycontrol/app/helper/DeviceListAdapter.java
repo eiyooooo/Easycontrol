@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.Random;
 
 import top.saymzx.easycontrol.app.DeviceDetailActivity;
+import top.saymzx.easycontrol.app.FileActivity;
 import top.saymzx.easycontrol.app.R;
 import top.saymzx.easycontrol.app.client.Client;
 import top.saymzx.easycontrol.app.client.tools.AdbTools;
@@ -29,7 +30,6 @@ import top.saymzx.easycontrol.app.entity.Device;
 public class DeviceListAdapter extends BaseAdapter {
 
   private final Context context;
-  private Device sendFileDevice;
   private static final int[] colors = {R.color.color1, R.color.color2, R.color.color3, R.color.color4, R.color.color5, R.color.color6, R.color.color7, R.color.color8, R.color.color9};
   private static final int[] onColors = {R.color.onColor1, R.color.onColor2, R.color.onColor3, R.color.onColor4, R.color.onColor5, R.color.onColor6, R.color.onColor7, R.color.onColor8, R.color.onColor9};
 
@@ -37,8 +37,8 @@ public class DeviceListAdapter extends BaseAdapter {
   private final Random random = new Random();
 
   public DeviceListAdapter(Context c) {
-    queryDevices();
     context = c;
+    queryDevices();
   }
 
   @Override
@@ -112,12 +112,9 @@ public class DeviceListAdapter extends BaseAdapter {
     dialog.show();
     itemSetDeviceBinding.buttonPushFile.setOnClickListener(v -> {
       dialog.cancel();
-      sendFileDevice = device;
-      Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-      intent.setType("*/*");
-      intent.addCategory(Intent.CATEGORY_OPENABLE);
-      intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, false);
-      ((Activity) context).startActivityForResult(intent, 1);
+      Intent intent = new Intent(context, FileActivity.class);
+      intent.putExtra("uuid", device.uuid);
+      context.startActivity(intent);
     });
   }
 
@@ -149,21 +146,6 @@ public class DeviceListAdapter extends BaseAdapter {
     AdbTools.runOnceCmd(device, "wm size reset", result -> AppData.uiHandler.post(() -> {
       loading.second.cancel();
       Toast.makeText(context, context.getString(result ? R.string.toast_success : R.string.toast_fail), Toast.LENGTH_SHORT).show();
-    }));
-  }
-
-  public void pushFile(InputStream inputStream, String fileName) {
-    if (inputStream == null) return;
-    Pair<ItemLoadingBinding, Dialog> loading = ViewTools.createLoading(context);
-    loading.second.show();
-    AdbTools.pushFile(sendFileDevice, inputStream, fileName, process -> AppData.uiHandler.post(() -> {
-      if (process < 0) {
-        loading.second.cancel();
-        Toast.makeText(context, context.getString(R.string.toast_fail), Toast.LENGTH_SHORT).show();
-      } else if (process == 100) {
-        loading.second.cancel();
-        Toast.makeText(context, context.getString(R.string.toast_success), Toast.LENGTH_SHORT).show();
-      } else loading.first.text.setText(process + " %");
     }));
   }
 

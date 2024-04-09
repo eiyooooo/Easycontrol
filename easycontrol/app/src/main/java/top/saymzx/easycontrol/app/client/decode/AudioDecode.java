@@ -110,7 +110,7 @@ public class AudioDecode {
 
   // 创建AudioTrack
   private void setAudioTrack() {
-    int bufferSize = Math.min(AudioTrack.getMinBufferSize(SAMPLE_RATE, AudioFormat.CHANNEL_OUT_STEREO, AudioFormat.ENCODING_PCM_16BIT) * 8, 16 * AUDIO_PACKET_SIZE);
+    int bufferSize = Math.min(AudioTrack.getMinBufferSize(SAMPLE_RATE, AudioFormat.CHANNEL_OUT_STEREO, AudioFormat.ENCODING_PCM_16BIT) * 6, 12 * AUDIO_PACKET_SIZE);
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
       AudioTrack.Builder audioTrackBuild = new AudioTrack.Builder();
       // 1

@@ -49,7 +49,7 @@ public class IpActivity extends Activity {
     }
   }
 
-  // 设置返回按钮监听
+  // 设置按钮监听
   private void setButtonListener() {
     activityIpBinding.backButton.setOnClickListener(v -> finish());
   }

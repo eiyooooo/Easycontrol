@@ -10,6 +10,9 @@ public class Device {
   public final int type;
   public String name;
   public String address = "";
+  public String startApp = "";
+  public int adbPort = 5555;
+  public int serverPort = 25166;
   public boolean isAudio = true;
   public int maxSize = 1600;
   public int maxFps = 60;
@@ -49,10 +52,6 @@ public class Device {
 
   public boolean isLinkDevice() {
     return type == TYPE_LINK;
-  }
-
-  public boolean isTempDevice() {
-    return Objects.equals(name, "----");
   }
 
   public Device clone(String uuid) {

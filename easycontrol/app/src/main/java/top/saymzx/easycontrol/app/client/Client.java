@@ -1,106 +1,106 @@
 package top.saymzx.easycontrol.app.client;
 
-import android.app.Dialog;
-import android.util.Pair;
+import android.os.Handler;
+import android.os.HandlerThread;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
-import java.util.Objects;
 
+import top.saymzx.easycontrol.app.R;
 import top.saymzx.easycontrol.app.client.tools.AdbTools;
-import top.saymzx.easycontrol.app.client.tools.ClientController;
-import top.saymzx.easycontrol.app.client.tools.ClientPlayer;
-import top.saymzx.easycontrol.app.client.tools.ClientStream;
+import top.saymzx.easycontrol.app.client.tools.AudioPlayer;
 import top.saymzx.easycontrol.app.client.tools.ControlPacket;
-import top.saymzx.easycontrol.app.databinding.ItemLoadingBinding;
+import top.saymzx.easycontrol.app.client.tools.DeviceTool;
+import top.saymzx.easycontrol.app.client.tools.FileTool;
+import top.saymzx.easycontrol.app.client.tools.Stream;
+import top.saymzx.easycontrol.app.client.tools.VideoPlayer;
 import top.saymzx.easycontrol.app.entity.AppData;
 import top.saymzx.easycontrol.app.entity.Device;
-import top.saymzx.easycontrol.app.helper.ViewTools;
+import top.saymzx.easycontrol.app.helper.PublicTools;
 
 public class Client {
   private static final HashMap<String, Client> allClient = new HashMap<>();
+
   private boolean isClosed = false;
+  private final Device device;
 
   // 组件
-  private ClientStream clientStream = null;
-  private ClientController clientController = null;
-  private ClientPlayer clientPlayer = null;
-  private Device device;
+  private Stream stream;
+  private ControlPacket controlPacket;
+  private VideoPlayer videoPlayer;
+  private AudioPlayer audioPlayer;
+  private DeviceTool deviceTool;
+  private FileTool fileTool;
 
-  public Client(Device device) {
-    if (allClient.containsKey(device.uuid)) return;
+  private static final HandlerThread mainHandlerThread = new HandlerThread("easycontrol_main");
+  private static Handler mainHandler;
+
+  public Client(Device device) throws Exception {
     this.device = device;
-    Pair<ItemLoadingBinding, Dialog> loading = ViewTools.createLoading(AppData.mainActivity);
-    loading.second.show();
-    // 连接
-    clientStream = new ClientStream(device, bool -> {
-      if (bool) {
-        allClient.put(device.uuid, this);
-        // 控制器、播放器
-        clientController = new ClientController(device, clientStream, () -> clientPlayer = new ClientPlayer(device.uuid, clientStream));
-        // 临时设备
-        boolean isTempDevice = device.isTempDevice();
-        // 启动界面
-        clientController.handleAction(device.changeToFullOnConnect ? "changeToFull" : "changeToSmall", null, 0);
-        // 运行启动时操作
-        if (device.customResolutionOnConnect) clientController.handleAction("writeByteBuffer", ControlPacket.createChangeResolutionEvent(device.customResolutionWidth, device.customResolutionHeight), 0);
-        if (!isTempDevice && device.wakeOnConnect) clientController.handleAction("buttonWake", null, 0);
-        if (!isTempDevice && device.lightOffOnConnect) clientController.handleAction("buttonLightOff", null, 2000);
-      }
-      if (loading.second.isShowing()) loading.second.cancel();
-    });
+    if (allClient.containsKey(device.uuid)) return;
+    mainHandlerThread.start();
+    mainHandler = new Handler(mainHandlerThread.getLooper());
+    try {
+      // 连接
+      stream = AdbTools.connectServer(AdbTools.connectADB(device), device);
+      controlPacket = new ControlPacket(stream);
+      // 连接检测
+      mainHandler.postDelayed(this::sendKeepAlive, 2000);
+      // 主程序
+      mainService();
+    } catch (Exception e) {
+      PublicTools.logToast("client", e.toString(), true);
+      release();
+    }
   }
 
-  public static void startDevice(Device device) {
-    if (device == null) return;
-    new Client(device);
+  private void sendKeepAlive() {
+    try {
+      controlPacket.keepAlive();
+    } catch (Exception ignored) {
+      PublicTools.logToast("client", AppData.applicationContext.getString(R.string.toast_stream_closed), true);
+      release();
+    }
   }
 
-  public static Device getDevice(String uuid) {
-    Client client = allClient.get(uuid);
-    if (client == null) return null;
-    return client.device;
-  }
-
-  public static ClientController getClientController(String uuid) {
-    Client client = allClient.get(uuid);
-    if (client == null) return null;
-    return client.clientController;
-  }
-
-  public static void sendAction(String uuid, String action, ByteBuffer byteBuffer, int delay) {
-    if (action == null || uuid == null) return;
-    if (action.equals("start")) {
-      for (Device device : AdbTools.devicesList) if (Objects.equals(device.uuid, uuid)) startDevice(device);
-    } else {
-      Client client = allClient.get(uuid);
-      if (client == null) return;
-      if (action.equals("close")) {
-        client.close(byteBuffer);
-      } else {
-        if (client.clientController == null) return;
-        client.clientController.handleAction(action, byteBuffer, delay);
+  private void mainService() throws IOException, InterruptedException {
+    while (!Thread.interrupted()) {
+      int mode = stream.readInt();
+      ByteBuffer data = stream.readByteArray(stream.readInt());
+      if (mode == ControlPacket.VIDEO_EVENT) {
+        if (videoPlayer == null || videoPlayer.isClosed()) videoPlayer = new VideoPlayer(device, controlPacket);
+        videoPlayer.handle(data);
+      } else if (mode == ControlPacket.AUDIO_EVENT) {
+        if (audioPlayer == null || audioPlayer.isClosed()) audioPlayer = new AudioPlayer(device, controlPacket);
+        audioPlayer.handle(data);
+      } else if (mode == ControlPacket.FILE_EVENT) {
+        if (fileTool == null || fileTool.isClosed()) fileTool = new FileTool(device, controlPacket);
+        fileTool.handle(data);
+      } else if (mode == ControlPacket.DEVICE_EVENT) {
+        if (deviceTool == null || deviceTool.isClosed()) deviceTool = new DeviceTool(device, controlPacket);
+        deviceTool.handle(data);
       }
     }
   }
 
-  private void close(ByteBuffer byteBuffer) {
+  public boolean isClosed() {
+    return isClosed;
+  }
+
+  public void release() {
     if (isClosed) return;
     isClosed = true;
-    // 临时设备
-    boolean isTempDevice = device.isTempDevice();
-    // 运行断开时操作
-    if (!isTempDevice && device.lockOnClose) clientController.handleAction("buttonLock", null, 0);
-    else if (!isTempDevice && device.lightOnClose) clientController.handleAction("buttonLight", null, 0);
     // 关闭组件
-    if (clientPlayer != null) clientPlayer.close();
-    if (clientController != null) clientController.close();
-    if (clientStream != null) clientStream.close();
+    mainHandlerThread.quit();
+    if (videoPlayer != null) videoPlayer.release();
+    if (audioPlayer != null) audioPlayer.release();
+    if (fileTool != null) fileTool.release();
+    if (deviceTool != null) deviceTool.release();
+    if (stream != null) stream.close();
     // 更新数据库
-    if (!isTempDevice) AppData.dbHelper.update(device);
+    AppData.dbHelper.update(device);
     allClient.remove(device.uuid);
-    // 如果设置了自动重连
-    if (byteBuffer != null && device.reconnectOnClose) startDevice(device);
   }
 
 }

@@ -44,9 +44,12 @@ public final class SurfaceControl {
     Method createClassLoaderMethod = Class.forName("com.android.internal.os.ClassLoaderFactory").getDeclaredMethod("createClassLoader", String.class, String.class, String.class, ClassLoader.class, int.class, boolean.class, String.class);
     ClassLoader classLoader = (ClassLoader) createClassLoaderMethod.invoke(null, "/system/framework/services.jar", null, null, ClassLoader.getSystemClassLoader(), 0, true, null);
     Class<?> displayControlClass = classLoader.loadClass("com.android.server.display.DisplayControl");
-    Method loadMethod = Runtime.class.getDeclaredMethod("loadLibrary0", Class.class, String.class);
-    loadMethod.setAccessible(true);
-    loadMethod.invoke(Runtime.getRuntime(), displayControlClass, "android_servers");
+    try {
+      Method loadMethod = Runtime.class.getDeclaredMethod("loadLibrary0", Class.class, String.class);
+      loadMethod.setAccessible(true);
+      loadMethod.invoke(Runtime.getRuntime(), displayControlClass, "android_servers");
+    } catch (Exception ignored) {
+    }
     getPhysicalDisplayIdsMethod = displayControlClass.getMethod("getPhysicalDisplayIds");
     getPhysicalDisplayTokenMethod = displayControlClass.getMethod("getPhysicalDisplayToken", long.class);
   }
@@ -65,6 +68,10 @@ public final class SurfaceControl {
 
   public static void setDisplayLayerStack(IBinder displayToken, int layerStack) throws NoSuchMethodException, InvocationTargetException, IllegalAccessException {
     CLASS.getMethod("setDisplayLayerStack", IBinder.class, int.class).invoke(null, displayToken, layerStack);
+  }
+
+  public static void setDisplaySize(IBinder displayToken, int width, int height) throws NoSuchMethodException, InvocationTargetException, IllegalAccessException {
+    CLASS.getMethod("setDisplaySize", IBinder.class, int.class, int.class).invoke(null, displayToken, width, height);
   }
 
   public static void setDisplaySurface(IBinder displayToken, Surface surface) throws NoSuchMethodException, InvocationTargetException, IllegalAccessException {

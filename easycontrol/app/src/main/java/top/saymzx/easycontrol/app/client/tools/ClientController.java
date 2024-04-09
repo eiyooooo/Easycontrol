@@ -6,8 +6,10 @@ import android.annotation.SuppressLint;
 import android.content.ClipData;
 import android.content.Intent;
 import android.graphics.SurfaceTexture;
+import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.provider.Settings;
 import android.util.Pair;
 import android.view.Display;
 import android.view.MotionEvent;
@@ -34,26 +36,17 @@ import top.saymzx.easycontrol.app.helper.PublicTools;
 
 public class ClientController implements TextureView.SurfaceTextureListener {
   private final Device device;
-  private final ClientStream clientStream;
+  private final ControlPacket controlPacket;
   private final MyInterface.MyFunction handle;
-  private final TextureView textureView = new TextureView(AppData.applicationContext);
-  private SurfaceTexture surfaceTexture;
 
-  private SmallView smallView;
-  private MiniView miniView;
-  private FullActivity fullView;
-
-  private Pair<Integer, Integer> videoSize;
-  private Pair<Integer, Integer> maxSize;
-  private Pair<Integer, Integer> surfaceSize;
 
   // 执行线程
   private final HandlerThread mainThread = new HandlerThread("easycontrol_client_main");
   private Handler mainHandler;
 
-  public ClientController(Device device, ClientStream clientStream, MyInterface.MyFunction handle) {
+  public ClientController(Device device, ControlPacket controlPacket, MyInterface.MyFunction handle) {
     this.device = device;
-    this.clientStream = clientStream;
+    this.controlPacket = controlPacket;
     this.handle = handle;
     mainThread.start();
     mainHandler = new Handler(mainThread.getLooper());
@@ -71,6 +64,9 @@ public class ClientController implements TextureView.SurfaceTextureListener {
   private void handleAction(String action, ByteBuffer byteBuffer) {
     try {
       switch (action) {
+        case "keepAlive":
+          controlPacket.keepAlive();
+          break;
         case "changeToSmall":
           changeToSmall();
           break;
@@ -111,9 +107,7 @@ public class ClientController implements TextureView.SurfaceTextureListener {
         case "buttonRotate":
           clientStream.writeToMain(ControlPacket.createRotateEvent());
           break;
-        case "keepAlive":
-          clientStream.writeToMain(ControlPacket.createKeepAlive());
-          break;
+
         case "checkSizeAndSite":
           checkSizeAndSite();
           break;
@@ -151,31 +145,16 @@ public class ClientController implements TextureView.SurfaceTextureListener {
     mainHandler.postDelayed(this::otherService, 2000);
   }
 
-  public void setFullView(FullActivity fullView) {
-    this.fullView = fullView;
-  }
 
-  public TextureView getTextureView() {
-    return textureView;
-  }
 
-  private synchronized void changeToFull() {
-    hide();
-    Intent intent = new Intent(AppData.mainActivity, FullActivity.class);
-    intent.putExtra("uuid", device.uuid);
-    AppData.mainActivity.startActivity(intent);
-  }
-
-  private synchronized void changeToSmall() {
-    hide();
-    if (smallView == null) smallView = new SmallView(device.uuid);
-    AppData.uiHandler.post(smallView::show);
-  }
-
-  private synchronized void changeToMini(ByteBuffer byteBuffer) {
-    hide();
-    if (miniView == null) miniView = new MiniView(device.uuid);
-    AppData.uiHandler.post(() -> miniView.show(byteBuffer));
+  // 检查悬浮窗权限
+  private boolean checkFloatPermission() {
+    // 检查悬浮窗权限，防止某些设备如鸿蒙不兼容
+    try {
+      return Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(AppData.applicationContext);
+    } catch (Exception ignored) {
+      return true;
+    }
   }
 
   private synchronized void changeToApp() throws Exception {
@@ -197,12 +176,7 @@ public class ClientController implements TextureView.SurfaceTextureListener {
     }
   }
 
-  private synchronized void hide() {
-    if (fullView != null) AppData.uiHandler.post(fullView::hide);
-    fullView = null;
-    if (smallView != null) AppData.uiHandler.post(smallView::hide);
-    if (miniView != null) AppData.uiHandler.post(miniView::hide);
-  }
+
 
   public void close() {
     hide();

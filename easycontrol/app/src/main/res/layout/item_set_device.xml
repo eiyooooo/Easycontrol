@@ -68,7 +68,7 @@
         <TextView
           android:layout_width="wrap_content"
           android:layout_height="wrap_content"
-          android:text="@string/set_device_buttons_send"
+          android:text="@string/set_device_buttons_file"
           android:textColor="@color/onButton"
           android:textSize="@dimen/smallFont" />
 

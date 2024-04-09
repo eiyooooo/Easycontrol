@@ -1,7 +1,7 @@
 /*
  * 本项目大量借鉴学习了开源投屏软件：Scrcpy，在此对该项目表示感谢
  */
-package top.saymzx.easycontrol.server.helper;
+package top.saymzx.easycontrol.server.encode;
 
 
 import android.annotation.SuppressLint;
@@ -21,35 +21,55 @@ import java.lang.ref.WeakReference;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.nio.ByteBuffer;
+
+import top.saymzx.easycontrol.server.tools.FakeContext;
 
 public final class AudioCapture {
-  public static final int SAMPLE_RATE = 48000;
-  private static final int CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_STEREO;
-  public static final int CHANNELS = 2;
-  private static final int CHANNEL_MASK = AudioFormat.CHANNEL_IN_LEFT | AudioFormat.CHANNEL_IN_RIGHT;
-  public static final int ENCODING = AudioFormat.ENCODING_PCM_16BIT;
-  private static final int BYTES_PER_SAMPLE = 2;
-  public static final int AUDIO_PACKET_SIZE = SAMPLE_RATE * CHANNELS * BYTES_PER_SAMPLE * 40 / 1000;
-  private static final int MINI_BUFFER_SIZE = Math.min(AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, ENCODING), AUDIO_PACKET_SIZE * 4);
+  private AudioRecord audioRecord;
+  public final int SAMPLE_RATE;
+  private final int CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_STEREO;
+  public final int CHANNELS = 2;
+  private final int ENCODING = AudioFormat.ENCODING_PCM_16BIT;
+  public final int AUDIO_PACKET_SIZE;
+  private final int MINI_BUFFER_SIZE;
 
-  public static AudioRecord init() {
-    AudioRecord recorder;
+  public AudioCapture(int audioSource, int sampleRate) {
+    SAMPLE_RATE = sampleRate;
+    int BYTES_PER_SAMPLE = 2;
+    AUDIO_PACKET_SIZE = SAMPLE_RATE * CHANNELS * BYTES_PER_SAMPLE * 40 / 1000;
+    MINI_BUFFER_SIZE = Math.min(AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, ENCODING), AUDIO_PACKET_SIZE * 4);
     try {
-      recorder = createAudioRecord();
+      audioRecord = createAudioRecord(audioSource);
     } catch (NullPointerException ignored) {
-      recorder = createAudioRecordVivo();
+      audioRecord = createAudioRecordVivo(audioSource);
     }
-    recorder.startRecording();
-    return recorder;
+  }
+
+  public void startRecord() {
+    if (audioRecord != null) audioRecord.startRecording();
+  }
+
+  public int read(ByteBuffer byteBuffer) {
+    int size = Math.min(byteBuffer.remaining(), AUDIO_PACKET_SIZE);
+    return audioRecord.read(byteBuffer, size);
+  }
+
+  public void stopRecord() {
+    if (audioRecord != null) audioRecord.stop();
+  }
+
+  public void release() {
+    if (audioRecord != null) audioRecord.release();
   }
 
   @SuppressLint({"WrongConstant", "MissingPermission"})
-  private static AudioRecord createAudioRecord() {
+  private AudioRecord createAudioRecord(int audioSource) {
     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
       AudioRecord.Builder audioRecordBuilder = new AudioRecord.Builder();
       if (VERSION.SDK_INT >= 31) audioRecordBuilder.setContext(FakeContext.get());
 
-      audioRecordBuilder.setAudioSource(MediaRecorder.AudioSource.REMOTE_SUBMIX);
+      audioRecordBuilder.setAudioSource(audioSource);
       AudioFormat.Builder audioFormatBuilder = new AudioFormat.Builder();
       audioFormatBuilder.setEncoding(ENCODING);
       audioFormatBuilder.setSampleRate(SAMPLE_RATE);
@@ -63,7 +83,7 @@ public final class AudioCapture {
 
   @TargetApi(Build.VERSION_CODES.R)
   @SuppressLint("WrongConstant,MissingPermission,BlockedPrivateApi,SoonBlockedPrivateApi,DiscouragedPrivateApi")
-  private static AudioRecord createAudioRecordVivo() {
+  private AudioRecord createAudioRecordVivo(int audioSource) {
     try {
       // AudioRecord audioRecord = new AudioRecord(0L);
       Constructor<AudioRecord> audioRecordConstructor = AudioRecord.class.getDeclaredConstructor(long.class);
@@ -88,7 +108,7 @@ public final class AudioCapture {
       // Create `AudioAttributes` with fixed capture preset
       AudioAttributes.Builder audioAttributesBuilder = new AudioAttributes.Builder();
       Method setInternalCapturePresetMethod = AudioAttributes.Builder.class.getMethod("setInternalCapturePreset", int.class);
-      setInternalCapturePresetMethod.invoke(audioAttributesBuilder, MediaRecorder.AudioSource.REMOTE_SUBMIX);
+      setInternalCapturePresetMethod.invoke(audioAttributesBuilder, audioSource);
       AudioAttributes attributes = audioAttributesBuilder.build();
 
       // audioRecord.mAudioAttributes = attributes;
@@ -111,6 +131,7 @@ public final class AudioCapture {
       // audioRecord.mChannelMask = channelMask
       Field mChannelMaskField = AudioRecord.class.getDeclaredField("mChannelMask");
       mChannelMaskField.setAccessible(true);
+      int CHANNEL_MASK = AudioFormat.CHANNEL_IN_LEFT | AudioFormat.CHANNEL_IN_RIGHT;
       mChannelMaskField.set(audioRecord, CHANNEL_MASK);
 
       // audioRecord.audioBuffSizeCheck(bufferSizeInBytes)

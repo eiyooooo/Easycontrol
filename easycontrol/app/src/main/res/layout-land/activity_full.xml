@@ -26,8 +26,7 @@
       android:layout_gravity="end"
       android:gravity="center"
       android:orientation="vertical"
-      android:paddingTop="20dp"
-      android:paddingBottom="20dp">
+      android:paddingTop="55dp">
 
       <ImageView
         android:id="@+id/button_switch"
@@ -62,10 +61,13 @@
       <ImageView
         android:id="@+id/button_auto_rotate"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
+        android:layout_height="55dp"
         android:focusable="false"
         android:padding="6dp"
+        android:paddingStart="6dp"
+        android:paddingTop="6dp"
+        android:paddingEnd="6dp"
+        android:paddingBottom="20dp"
         android:src="@drawable/un_auto"
         android:tint="@color/onCardBackground" />
 
@@ -80,29 +82,25 @@
       android:orientation="horizontal" />
   </LinearLayout>
 
-  <FrameLayout
-    android:id="@+id/bar"
-    android:layout_width="20dp"
-    android:layout_height="60dp"
-    android:layout_gravity="end|top"
-    android:layout_marginTop="80dp">
-
-    <View
-      android:layout_width="5dp"
-      android:layout_height="40dp"
-      android:layout_gravity="center"
-      android:background="@drawable/background_cron"
-      android:backgroundTint="@color/clientBar"
-      android:focusable="false" />
-  </FrameLayout>
+  <ImageView
+    android:id="@+id/button_more"
+    android:layout_width="35dp"
+    android:layout_height="55dp"
+    android:focusable="false"
+    android:paddingStart="6dp"
+    android:paddingTop="20dp"
+    android:paddingEnd="6dp"
+    android:paddingBottom="6dp"
+    android:src="@drawable/ellipsis_vertical"
+    android:tint="@color/onBackground" />
 
   <LinearLayout
     android:id="@+id/bar_view"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
-    android:layout_gravity="end|top"
-    android:layout_marginTop="75dp"
-    android:layout_marginEnd="25dp"
+    android:layout_gravity="start|top"
+    android:layout_marginStart="50dp"
+    android:layout_marginTop="15dp"
     android:background="@drawable/background_cron"
     android:elevation="6dp"
     android:orientation="vertical"

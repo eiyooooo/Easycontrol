@@ -4,22 +4,19 @@
 package top.saymzx.easycontrol.server.wrappers;
 
 import android.content.ClipData;
-import android.content.IOnPrimaryClipChangedListener;
 import android.os.Build;
 import android.os.IInterface;
 
 import java.lang.reflect.Method;
 
-import top.saymzx.easycontrol.server.helper.FakeContext;
+import top.saymzx.easycontrol.server.tools.FakeContext;
 
 public class ClipboardManager {
   private static IInterface manager;
   private static Method getPrimaryClipMethod = null;
   private static Method setPrimaryClipMethod = null;
-  private static Method addPrimaryClipChangedListener = null;
   private static int getMethodVersion;
   private static int setMethodVersion;
-  private static int addListenerMethodVersion;
 
   public static void init(IInterface m) {
     manager = m;
@@ -27,7 +24,6 @@ public class ClipboardManager {
     try {
       getGetPrimaryClipMethod();
       getSetPrimaryClipMethod();
-      getAddPrimaryClipChangedListenerMethod();
     } catch (Exception ignored) {
     }
   }
@@ -80,50 +76,6 @@ public class ClipboardManager {
         } catch (Exception ignored) {
         }
       }
-    }
-  }
-
-  private static void getAddPrimaryClipChangedListenerMethod() throws NoSuchMethodException {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) addPrimaryClipChangedListener = manager.getClass().getMethod("addPrimaryClipChangedListener", IOnPrimaryClipChangedListener.class, String.class);
-    else {
-      for (int i = 0; i < 3; i++) {
-        try {
-          addListenerMethodVersion = i;
-          switch (i) {
-            case 0:
-              addPrimaryClipChangedListener = manager.getClass().getMethod("addPrimaryClipChangedListener", IOnPrimaryClipChangedListener.class, String.class, int.class);
-              return;
-            case 1:
-              addPrimaryClipChangedListener = manager.getClass().getMethod("addPrimaryClipChangedListener", IOnPrimaryClipChangedListener.class, String.class, String.class, int.class);
-              return;
-            case 2:
-              addPrimaryClipChangedListener = manager.getClass().getMethod("addPrimaryClipChangedListener", IOnPrimaryClipChangedListener.class, String.class, String.class, int.class, int.class);
-              return;
-          }
-        } catch (Exception ignored) {
-        }
-      }
-    }
-  }
-
-  public static void addPrimaryClipChangedListener(IOnPrimaryClipChangedListener listener) {
-    if (addPrimaryClipChangedListener == null) return;
-    try {
-      if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) addPrimaryClipChangedListener.invoke(manager, listener, FakeContext.PACKAGE_NAME);
-      else {
-        switch (addListenerMethodVersion) {
-          case 0:
-            addPrimaryClipChangedListener.invoke(manager, listener, FakeContext.PACKAGE_NAME, FakeContext.ROOT_UID);
-            break;
-          case 1:
-            addPrimaryClipChangedListener.invoke(manager, listener, FakeContext.PACKAGE_NAME, null, FakeContext.ROOT_UID);
-            break;
-          default:
-            addPrimaryClipChangedListener.invoke(manager, listener, FakeContext.PACKAGE_NAME, null, FakeContext.ROOT_UID, 0);
-            break;
-        }
-      }
-    } catch (Exception ignored) {
     }
   }
 

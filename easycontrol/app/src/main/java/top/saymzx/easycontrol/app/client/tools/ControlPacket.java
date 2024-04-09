@@ -47,7 +47,8 @@ public class ControlPacket {
   public static final int DEVICE_KEY = 405;
   public static final int DEVICE_ROTATE = 406;
   public static final int DEVICE_LIGHT = 407;
-  public static final int DEVICE_CHANGE_SIZE = 408;
+  public static final int DEVICE_SCREEN = 408;
+  public static final int DEVICE_CHANGE_SIZE = 409;
 
   public ControlPacket(Stream stream) {
     this.stream = stream;
@@ -134,6 +135,22 @@ public class ControlPacket {
     stream.write(AUDIO_EVENT, byteBuffer);
   }
 
+  public void fileError(String error) throws Exception {
+    byte[] tmpTextByte = null;
+    if (error != null) {
+      tmpTextByte = error.getBytes(StandardCharsets.UTF_8);
+      if (tmpTextByte.length == 0 || tmpTextByte.length > 5000) {
+        tmpTextByte = null;
+      }
+    }
+    int tmpTextByteSize = tmpTextByte == null ? 0 : tmpTextByte.length;
+    ByteBuffer byteBuffer = ByteBuffer.allocate(4 + tmpTextByteSize);
+    byteBuffer.putInt(FILE_ERROR);
+    if (tmpTextByte != null) byteBuffer.put(tmpTextByte);
+    byteBuffer.flip();
+    stream.write(FILE_EVENT, byteBuffer);
+  }
+
   public void deviceError(String error) throws Exception {
     byte[] tmpTextByte = null;
     if (error != null) {
@@ -150,42 +167,11 @@ public class ControlPacket {
     stream.write(DEVICE_EVENT, byteBuffer);
   }
 
-  public void deviceConfig(boolean listenerClip,boolean keepScreenOn) throws Exception {
-    ByteBuffer byteBuffer = ByteBuffer.allocate(4 + 4*2);
+  public void deviceConfig(boolean listenerClip, boolean keepScreenOn) throws Exception {
+    ByteBuffer byteBuffer = ByteBuffer.allocate(4 + 4 * 2);
     byteBuffer.putInt(DEVICE_CONFIG);
     byteBuffer.putInt(listenerClip ? 1 : 0);
     byteBuffer.putInt(keepScreenOn ? 1 : 0);
-    byteBuffer.flip();
-    stream.write(DEVICE_EVENT, byteBuffer);
-  }
-
-  public void deviceTouch(int action, int pointerId, float x, float y, int offsetTime) throws Exception {
-    if (x < 0 || x > 1 || y < 0 || y > 1) {
-      // 超出范围则改为抬起事件
-      if (x < 0) x = 0;
-      if (x > 1) x = 1;
-      if (y < 0) y = 0;
-      if (y > 1) y = 1;
-      action = MotionEvent.ACTION_UP;
-    }
-    ByteBuffer byteBuffer = ByteBuffer.allocate(4 + 4 * 5);
-    byteBuffer.putInt(DEVICE_TOUCH);
-    byteBuffer.putInt(action);
-    byteBuffer.putInt(pointerId);
-    // 坐标位置
-    byteBuffer.putFloat(x);
-    byteBuffer.putFloat(y);
-    // 时间偏移
-    byteBuffer.putInt(offsetTime);
-    byteBuffer.flip();
-    stream.write(DEVICE_EVENT, byteBuffer);
-  }
-
-  public void deviceKey(int key, int meta) throws Exception {
-    ByteBuffer byteBuffer = ByteBuffer.allocate(4 + 4 * 2);
-    byteBuffer.putInt(DEVICE_KEY);
-    byteBuffer.putInt(key);
-    byteBuffer.putInt(meta);
     byteBuffer.flip();
     stream.write(DEVICE_EVENT, byteBuffer);
   }
@@ -200,17 +186,59 @@ public class ControlPacket {
     stream.write(DEVICE_EVENT, byteBuffer);
   }
 
-  public void deviceRotate() throws Exception {
-    ByteBuffer byteBuffer = ByteBuffer.allocate(4);
-    byteBuffer.putInt(DEVICE_ROTATE);
+  public void deviceTouch(int displayId, int action, int pointerId, int x, int y, int offsetTime) throws Exception {
+    if (x < 0 || x > 1 || y < 0 || y > 1) {
+      // 超出范围则改为抬起事件
+      if (x < 0) x = 0;
+      if (x > 1) x = 1;
+      if (y < 0) y = 0;
+      if (y > 1) y = 1;
+      action = MotionEvent.ACTION_UP;
+    }
+    ByteBuffer byteBuffer = ByteBuffer.allocate(4 * 2 + 4 * 5);
+    byteBuffer.putInt(DEVICE_TOUCH);
+    byteBuffer.putInt(displayId);
+    byteBuffer.putInt(action);
+    byteBuffer.putInt(pointerId);
+    // 坐标位置
+    byteBuffer.putInt(x);
+    byteBuffer.putInt(y);
+    // 时间偏移
+    byteBuffer.putInt(offsetTime);
     byteBuffer.flip();
     stream.write(DEVICE_EVENT, byteBuffer);
   }
 
-  public void deviceLight(int mode) throws Exception {
+  public void deviceKey(int displayId, int key, int meta) throws Exception {
+    ByteBuffer byteBuffer = ByteBuffer.allocate(4 * 2 + 4 * 2);
+    byteBuffer.putInt(DEVICE_KEY);
+    byteBuffer.putInt(displayId);
+    byteBuffer.putInt(key);
+    byteBuffer.putInt(meta);
+    byteBuffer.flip();
+    stream.write(DEVICE_EVENT, byteBuffer);
+  }
+
+  public void deviceRotate(int displayId) throws Exception {
     ByteBuffer byteBuffer = ByteBuffer.allocate(4 + 4);
+    byteBuffer.putInt(DEVICE_ROTATE);
+    byteBuffer.putInt(displayId);
+    byteBuffer.flip();
+    stream.write(DEVICE_EVENT, byteBuffer);
+  }
+
+  public void deviceLight(int displayId, int mode) throws Exception {
+    ByteBuffer byteBuffer = ByteBuffer.allocate(4 * 2 + 4);
     byteBuffer.putInt(DEVICE_LIGHT);
+    byteBuffer.putInt(displayId);
     byteBuffer.putInt(mode);
+    byteBuffer.flip();
+    stream.write(DEVICE_EVENT, byteBuffer);
+  }
+
+  public void deviceScreen() throws Exception {
+    ByteBuffer byteBuffer = ByteBuffer.allocate(4);
+    byteBuffer.putInt(DEVICE_SCREEN);
     byteBuffer.flip();
     stream.write(DEVICE_EVENT, byteBuffer);
   }

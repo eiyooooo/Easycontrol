@@ -9,7 +9,7 @@
   <FrameLayout
     android:layout_width="0dp"
     android:layout_height="match_parent"
-    android:layout_weight="1">
+    android:layout_weight="4">
 
     <ImageView
       android:layout_width="match_parent"
@@ -80,16 +80,15 @@
   <FrameLayout
     android:layout_width="0dp"
     android:layout_height="match_parent"
-    android:layout_weight="1">
+    android:layout_weight="5">
 
     <ListView
       android:id="@+id/devices_list"
       android:layout_width="match_parent"
       android:layout_height="match_parent"
-      android:layout_marginTop="6dp"
       android:divider="#00000000"
       android:dividerHeight="14dp"
-      android:padding="15dp"
+      android:padding="10dp"
       tools:listitem="@layout/item_devices_item" />
   </FrameLayout>
 

@@ -4,7 +4,6 @@
 package top.saymzx.easycontrol.server.wrappers;
 
 import android.os.IInterface;
-import android.view.IRotationWatcher;
 
 import java.lang.reflect.Method;
 
@@ -60,17 +59,6 @@ public final class WindowManager {
     try {
       if (thawDisplayRotationMethod != null) thawDisplayRotationMethod.invoke(manager, displayId);
       else if (thawRotationMethod != null) thawRotationMethod.invoke(manager);
-    } catch (Exception ignored) {
-    }
-  }
-
-  public static void registerRotationWatcher(IRotationWatcher rotationWatcher, int displayId) {
-    try {
-      try {
-        CLASS.getMethod("watchRotation", IRotationWatcher.class, int.class).invoke(manager, rotationWatcher, displayId);
-      } catch (NoSuchMethodException e) {
-        CLASS.getMethod("watchRotation", IRotationWatcher.class).invoke(manager, rotationWatcher);
-      }
     } catch (Exception ignored) {
     }
   }

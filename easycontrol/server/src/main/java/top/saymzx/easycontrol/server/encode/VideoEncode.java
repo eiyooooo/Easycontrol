@@ -3,13 +3,13 @@
  */
 package top.saymzx.easycontrol.server.encode;
 
+import android.hardware.display.VirtualDisplay;
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
-import android.system.ErrnoException;
 import android.util.Pair;
 import android.view.Display;
 import android.view.Surface;
@@ -22,14 +22,17 @@ import java.util.Objects;
 
 import top.saymzx.easycontrol.server.entity.DisplayInfo;
 import top.saymzx.easycontrol.server.tools.ControlPacket;
+import top.saymzx.easycontrol.server.wrappers.DeviceManager;
 import top.saymzx.easycontrol.server.wrappers.DisplayManager;
 import top.saymzx.easycontrol.server.wrappers.SurfaceControl;
 
 public final class VideoEncode {
+  private final int id;
   private static boolean isClosed = false;
   private final Handler mainHandler;
   private final ControlPacket controlPacket;
   private IBinder display;
+  private VirtualDisplay virtualDisplay;
   private int displayId = Display.DEFAULT_DISPLAY;
 
   private MediaCodec encedec;
@@ -44,7 +47,8 @@ public final class VideoEncode {
   private final ArrayList<Thread> workThreads = new ArrayList<>();
 
 
-  public VideoEncode(Handler mainHandler, ControlPacket controlPacket) {
+  public VideoEncode(int id, Handler mainHandler, ControlPacket controlPacket) {
+    this.id = id;
     this.mainHandler = mainHandler;
     this.controlPacket = controlPacket;
     try {
@@ -61,14 +65,19 @@ public final class VideoEncode {
     if (isClosed) return;
     try {
       int mode = byteBuffer.getInt();
-      if (mode == ControlPacket.VIDEO_INIT) handleVideoInit(byteBuffer);
+      if (mode == ControlPacket.AUDIO_ERROR) handleVideoError(byteBuffer);
+      else if (mode == ControlPacket.VIDEO_INIT) handleVideoInit(byteBuffer);
       else if (mode == ControlPacket.VIDEO_CONFIG) handleVideoConfig(byteBuffer);
     } catch (Exception e) {
       release(e.toString());
     }
   }
 
-  public void handleVideoInit(ByteBuffer byteBuffer) throws InvocationTargetException, NoSuchMethodException, IllegalAccessException, IOException, ErrnoException {
+  public void handleVideoError(ByteBuffer byteBuffer) throws IOException {
+    release(byteBuffer.toString());
+  }
+
+  public void handleVideoInit(ByteBuffer byteBuffer) throws Exception {
     // 已经初始化过则忽略
     if (encedec != null) return;
     // 读取初始化参数
@@ -76,10 +85,9 @@ public final class VideoEncode {
     String startApp = byteBuffer.toString();
     // 是否单应用投屏
     if (!Objects.equals(startApp, "")) {
-      // 暂且关闭
-//      virtualDisplay = DisplayManager.createVirtualDisplay();
-//      displayId = virtualDisplay.getDisplay().getDisplayId();
-//      DeviceTool.startAndMoveAppToVirtualDisplay();
+      virtualDisplay = DisplayManager.createVirtualDisplay();
+      displayId = virtualDisplay.getDisplay().getDisplayId();
+      DeviceManager.startAndMoveAppToVirtualDisplay(startApp, displayId);
     }
     // 完成初始化
     String codecMime = supportHevc ? MediaFormat.MIMETYPE_VIDEO_HEVC : MediaFormat.MIMETYPE_VIDEO_AVC;
@@ -126,7 +134,7 @@ public final class VideoEncode {
     SurfaceControl.setDisplaySize(display, videoSize.first, videoSize.second);
     encedec.configure(encodecFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
     // 发送新的视频参数
-    controlPacket.videoInfo(supportHevc, videoSize.first, videoSize.second);
+    controlPacket.videoInfo(id, supportHevc, displayInfo.width, displayInfo.height, videoSize.first, videoSize.second);
     // 启动编码
     encedec.start();
     workThreads.clear();
@@ -178,7 +186,7 @@ public final class VideoEncode {
         do outIndex = encedec.dequeueOutputBuffer(bufferInfo, -1); while (outIndex < 0);
         ByteBuffer buffer = encedec.getOutputBuffer(outIndex);
         if (buffer == null) continue;
-        controlPacket.videoFrame(bufferInfo.presentationTimeUs, buffer);
+        controlPacket.videoFrame(id, bufferInfo.presentationTimeUs, buffer);
         encedec.releaseOutputBuffer(outIndex, false);
       } catch (IllegalStateException ignored) {
       } catch (Exception e) {
@@ -199,7 +207,7 @@ public final class VideoEncode {
       SurfaceControl.destroyDisplay(display);
       surface.release();
       encedec.release();
-      controlPacket.videoError(error);
+      controlPacket.videoError(id, error);
     } catch (Exception ignored) {
     }
   }

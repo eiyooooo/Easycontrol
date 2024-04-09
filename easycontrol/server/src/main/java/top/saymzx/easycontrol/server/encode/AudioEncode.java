@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import top.saymzx.easycontrol.server.tools.ControlPacket;
 
 public final class AudioEncode {
+  private final int id;
   private boolean isClosed = false;
   private final Handler mainHandler;
   private final ControlPacket controlPacket;
@@ -24,8 +25,9 @@ public final class AudioEncode {
   private boolean supportOpus = EncodecTools.isSupportOpus();
   private final ArrayList<Thread> workThreads = new ArrayList<>();
 
-  public AudioEncode(Handler mainHandler, ControlPacket controlPacket) {
-    this.mainHandler=mainHandler;
+  public AudioEncode(int id, Handler mainHandler, ControlPacket controlPacket) {
+    this.id = id;
+    this.mainHandler = mainHandler;
     this.controlPacket = controlPacket;
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) release("Need android 12+");
   }
@@ -34,11 +36,16 @@ public final class AudioEncode {
     if (isClosed) return;
     try {
       int mode = byteBuffer.getInt();
-      if (mode == ControlPacket.AUDIO_INIT) handleAudioInit(byteBuffer);
+      if (mode == ControlPacket.AUDIO_ERROR) handleAudioError(byteBuffer);
+      else if (mode == ControlPacket.AUDIO_INIT) handleAudioInit(byteBuffer);
       else if (mode == ControlPacket.AUDIO_CONFIG) handleAudioConfig(byteBuffer);
     } catch (Exception e) {
       release(e.toString());
     }
+  }
+
+  public void handleAudioError(ByteBuffer byteBuffer) throws IOException {
+    release(byteBuffer.toString());
   }
 
   public void handleAudioInit(ByteBuffer byteBuffer) throws IOException {
@@ -69,7 +76,7 @@ public final class AudioEncode {
     encodecFormat.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, audioCapture.AUDIO_PACKET_SIZE);
     encedec.configure(encodecFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
     // 发送新的视频参数
-    controlPacket.audioInfo(supportOpus);
+    controlPacket.audioInfo(id, supportOpus);
     // 启动编码
     encedec.start();
     workThreads.clear();
@@ -125,7 +132,7 @@ public final class AudioEncode {
             return;
           }
         }
-        controlPacket.audioFrame(buffer);
+        controlPacket.audioFrame(id, buffer);
         encedec.releaseOutputBuffer(outIndex, false);
       } catch (IllegalStateException ignored) {
       } catch (Exception e) {
@@ -145,7 +152,7 @@ public final class AudioEncode {
       stopEncode();
       audioCapture.release();
       encedec.release();
-      controlPacket.audioError(error);
+      controlPacket.audioError(id, error);
     } catch (Exception ignored) {
     }
   }

@@ -5,6 +5,7 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.hardware.SensorManager;
 import android.hardware.usb.UsbManager;
+import android.media.projection.MediaProjection;
 import android.net.wifi.WifiManager;
 import android.os.Handler;
 import android.view.WindowManager;
@@ -36,6 +37,7 @@ public class AppData {
   // 设置值
   public static Setting setting;
 
+  @SuppressLint("ServiceCast")
   public static void init(MainActivity m) {
     mainActivity = m;
     applicationContext = m.getApplicationContext();

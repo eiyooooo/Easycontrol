@@ -147,15 +147,7 @@ public class ClientController implements TextureView.SurfaceTextureListener {
 
 
 
-  // 检查悬浮窗权限
-  private boolean checkFloatPermission() {
-    // 检查悬浮窗权限，防止某些设备如鸿蒙不兼容
-    try {
-      return Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(AppData.applicationContext);
-    } catch (Exception ignored) {
-      return true;
-    }
-  }
+
 
   private synchronized void changeToApp() throws Exception {
     // 获取当前APP
@@ -184,126 +176,9 @@ public class ClientController implements TextureView.SurfaceTextureListener {
     if (surfaceTexture != null) surfaceTexture.release();
   }
 
-  private static final int minLength = PublicTools.dp2px(200f);
 
-  private void updateMaxSize(ByteBuffer byteBuffer) {
-    int width = Math.max(byteBuffer.getInt(), minLength);
-    int height = Math.max(byteBuffer.getInt(), minLength);
-    this.maxSize = new Pair<>(width, height);
-    AppData.uiHandler.post(this::reCalculateTextureViewSize);
-  }
 
-  private void updateVideoSize(ByteBuffer byteBuffer) {
-    int width = byteBuffer.getInt();
-    int height = byteBuffer.getInt();
-    if (width <= 100 || height <= 100) return;
-    this.videoSize = new Pair<>(width, height);
-    AppData.uiHandler.post(this::reCalculateTextureViewSize);
-  }
 
-  // 重新计算TextureView大小
-  private void reCalculateTextureViewSize() {
-    if (maxSize == null || videoSize == null) return;
-    // 根据原画面大小videoSize计算在maxSize空间内的最大缩放大小
-    int tmp1 = videoSize.second * maxSize.first / videoSize.first;
-    // 横向最大不会超出
-    if (maxSize.second > tmp1) surfaceSize = new Pair<>(maxSize.first, tmp1);
-      // 竖向最大不会超出
-    else surfaceSize = new Pair<>(videoSize.first * maxSize.second / videoSize.second, maxSize.second);
-    // 更新大小
-    ViewGroup.LayoutParams layoutParams = textureView.getLayoutParams();
-    layoutParams.width = surfaceSize.first;
-    layoutParams.height = surfaceSize.second;
-    textureView.setLayoutParams(layoutParams);
-  }
 
-  // 检查画面是否超出
-  private void checkSizeAndSite() {
-    // 碎碎念，感谢 波瑠卡 的关爱，今天一家四口一起去医院进年货去了，每人提了一袋子(´；ω；`)
-    if (smallView != null) AppData.uiHandler.post(smallView::checkSizeAndSite);
-  }
-
-  // 设置视频区域触摸监听
-  @SuppressLint("ClickableViewAccessibility")
-  private void setTouchListener() {
-    textureView.setOnTouchListener((view, event) -> {
-      if (surfaceSize == null) return true;
-      int action = event.getActionMasked();
-      if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
-        int i = event.getActionIndex();
-        pointerDownTime[i] = event.getEventTime();
-        createTouchPacket(event, MotionEvent.ACTION_DOWN, i);
-      } else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_POINTER_UP) createTouchPacket(event, MotionEvent.ACTION_UP, event.getActionIndex());
-      else for (int i = 0; i < event.getPointerCount(); i++) createTouchPacket(event, MotionEvent.ACTION_MOVE, i);
-      return true;
-    });
-  }
-
-  private final int[] pointerList = new int[20];
-  private final long[] pointerDownTime = new long[10];
-
-  private void createTouchPacket(MotionEvent event, int action, int i) {
-    int offsetTime = (int) (event.getEventTime() - pointerDownTime[i]);
-    int x = (int) event.getX(i);
-    int y = (int) event.getY(i);
-    int p = event.getPointerId(i);
-    if (action == MotionEvent.ACTION_MOVE) {
-      // 减少发送小范围移动(小于4的圆内不做处理)
-      int flipY = pointerList[10 + p] - y;
-      if (flipY > -4 && flipY < 4) {
-        int flipX = pointerList[p] - x;
-        if (flipX > -4 && flipX < 4) return;
-      }
-    }
-    pointerList[p] = x;
-    pointerList[10 + p] = y;
-    handleAction("writeByteBuffer", ControlPacket.createTouchEvent(action, p, (float) x / surfaceSize.first, (float) y / surfaceSize.second, offsetTime), 0);
-  }
-
-  // 剪切板
-  private String nowClipboardText = "";
-
-  private void checkClipBoard() {
-    ClipData clipBoard = AppData.clipBoard.getPrimaryClip();
-    if (clipBoard != null && clipBoard.getItemCount() > 0) {
-      String newClipBoardText = String.valueOf(clipBoard.getItemAt(0).getText());
-      if (!Objects.equals(nowClipboardText, newClipBoardText)) {
-        nowClipboardText = newClipBoardText;
-        handleAction("writeByteBuffer", ControlPacket.createClipboardEvent(nowClipboardText), 0);
-      }
-    }
-  }
-
-  private void setClipBoard(ByteBuffer byteBuffer) {
-    nowClipboardText = new String(byteBuffer.array());
-    AppData.clipBoard.setPrimaryClip(ClipData.newPlainText(MIMETYPE_TEXT_PLAIN, nowClipboardText));
-  }
-
-  private void runShell(ByteBuffer byteBuffer) throws Exception {
-    String cmd = new String(byteBuffer.array());
-    clientStream.runShell(cmd);
-  }
-
-  @Override
-  public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surfaceTexture, int i, int i1) {
-    // 初始化
-    if (this.surfaceTexture == null) {
-      this.surfaceTexture = surfaceTexture;
-      handle.run();
-    } else textureView.setSurfaceTexture(this.surfaceTexture);
-  }
-
-  @Override
-  public void onSurfaceTextureSizeChanged(@NonNull SurfaceTexture surfaceTexture, int i, int i1) {
-  }
-
-  @Override
-  public boolean onSurfaceTextureDestroyed(@NonNull SurfaceTexture surfaceTexture) {
-    return false;
-  }
-
-  @Override
-  public void onSurfaceTextureUpdated(@NonNull SurfaceTexture surfaceTexture) {
-  }
 
 }

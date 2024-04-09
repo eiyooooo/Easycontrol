@@ -3,18 +3,17 @@ package top.saymzx.easycontrol.app.client;
 import android.os.Handler;
 import android.os.HandlerThread;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 
 import top.saymzx.easycontrol.app.R;
+import top.saymzx.easycontrol.app.client.decode.AudioDecode;
+import top.saymzx.easycontrol.app.client.decode.VideoDecode;
 import top.saymzx.easycontrol.app.client.tools.AdbTools;
-import top.saymzx.easycontrol.app.client.tools.AudioPlayer;
 import top.saymzx.easycontrol.app.client.tools.ControlPacket;
 import top.saymzx.easycontrol.app.client.tools.DeviceTool;
 import top.saymzx.easycontrol.app.client.tools.FileTool;
 import top.saymzx.easycontrol.app.client.tools.Stream;
-import top.saymzx.easycontrol.app.client.tools.VideoPlayer;
 import top.saymzx.easycontrol.app.entity.AppData;
 import top.saymzx.easycontrol.app.entity.Device;
 import top.saymzx.easycontrol.app.helper.PublicTools;
@@ -28,8 +27,8 @@ public class Client {
   // 组件
   private Stream stream;
   private ControlPacket controlPacket;
-  private VideoPlayer videoPlayer;
-  private AudioPlayer audioPlayer;
+  private static final HashMap<Integer, VideoDecode> videoDecodes = new HashMap<>();
+  private static final HashMap<Integer, AudioDecode> audioDecodes = new HashMap<>();
   private DeviceTool deviceTool;
   private FileTool fileTool;
 
@@ -64,21 +63,25 @@ public class Client {
     }
   }
 
-  private void mainService() throws IOException, InterruptedException {
+  private void mainService() throws Exception {
     while (!Thread.interrupted()) {
       int mode = stream.readInt();
       ByteBuffer data = stream.readByteArray(stream.readInt());
       if (mode == ControlPacket.VIDEO_EVENT) {
-        if (videoPlayer == null || videoPlayer.isClosed()) videoPlayer = new VideoPlayer(device, controlPacket);
-        videoPlayer.handle(data);
+        int videoId = stream.readInt();
+        VideoDecode videoDecode = videoDecodes.get(videoId);
+        if (videoDecode == null || videoDecode.isClosed()) controlPacket.videoError(videoId, "videoId is close");
+        else videoDecode.handle(data);
       } else if (mode == ControlPacket.AUDIO_EVENT) {
-        if (audioPlayer == null || audioPlayer.isClosed()) audioPlayer = new AudioPlayer(device, controlPacket);
-        audioPlayer.handle(data);
+        int auidoId = stream.readInt();
+        AudioDecode audioDecode = audioDecodes.get(auidoId);
+        if (audioDecode == null || audioDecode.isClosed()) controlPacket.audioError(auidoId, "audioId is close");
+        else audioDecode.handle(data);
       } else if (mode == ControlPacket.FILE_EVENT) {
-        if (fileTool == null || fileTool.isClosed()) fileTool = new FileTool(device, controlPacket);
+        if (fileTool == null || fileTool.isClosed()) controlPacket.fileError("file is close");
         fileTool.handle(data);
       } else if (mode == ControlPacket.DEVICE_EVENT) {
-        if (deviceTool == null || deviceTool.isClosed()) deviceTool = new DeviceTool(device, controlPacket);
+        if (deviceTool == null || deviceTool.isClosed()) controlPacket.deviceError("device is close");
         deviceTool.handle(data);
       }
     }
@@ -93,10 +96,10 @@ public class Client {
     isClosed = true;
     // 关闭组件
     mainHandlerThread.quit();
-    if (videoPlayer != null) videoPlayer.release();
-    if (audioPlayer != null) audioPlayer.release();
-    if (fileTool != null) fileTool.release();
-    if (deviceTool != null) deviceTool.release();
+    for (VideoDecode videoDecode : videoDecodes.values()) videoDecode.release(null);
+    for (AudioDecode audioDecode : audioDecodes.values()) audioDecode.release(null);
+    if (fileTool != null) fileTool.release(null);
+    if (deviceTool != null) deviceTool.release(null);
     if (stream != null) stream.close();
     // 更新数据库
     AppData.dbHelper.update(device);

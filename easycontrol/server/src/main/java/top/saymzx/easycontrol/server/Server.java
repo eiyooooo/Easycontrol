@@ -115,26 +115,26 @@ public final class Server {
       ByteBuffer data = stream.readByteArray(stream.readInt());
       if (mode == ControlPacket.KEEPALIVE_EVENT) lastKeepAliveTime = System.currentTimeMillis();
       else if (mode == ControlPacket.VIDEO_EVENT) {
-        int videoEncodeId = stream.readInt();
-        VideoEncode videoEncode = videoEncodes.get(videoEncodeId);
+        int videoId = stream.readInt();
+        VideoEncode videoEncode = videoEncodes.get(videoId);
         if (videoEncode == null || videoEncode.isClosed()) {
           videoEncode = new VideoEncode(mainHandler, controlPacket);
-          videoEncodes.put(videoEncodeId, videoEncode);
+          videoEncodes.put(videoId, videoEncode);
         }
         videoEncode.handle(data);
       } else if (mode == ControlPacket.AUDIO_EVENT) {
-        int auidoEncodeId = stream.readInt();
-        AudioEncode audioEncode = audioEncodes.get(auidoEncodeId);
+        int auidoId = stream.readInt();
+        AudioEncode audioEncode = audioEncodes.get(auidoId);
         if (audioEncode == null || audioEncode.isClosed()) {
           audioEncode = new AudioEncode(mainHandler, controlPacket);
-          audioEncodes.put(auidoEncodeId, audioEncode);
+          audioEncodes.put(auidoId, audioEncode);
         }
         audioEncode.handle(data);
       } else if (mode == ControlPacket.FILE_EVENT) {
-        if (fileTool == null || fileTool.isClosed()) fileTool = new FileTool(controlPacket);
+        if (fileTool == null || fileTool.isClosed()) fileTool = new FileTool(mainHandler, controlPacket);
         fileTool.handle(data);
       } else if (mode == ControlPacket.DEVICE_EVENT) {
-        if (deviceTool == null || deviceTool.isClosed()) deviceTool = new DeviceTool(controlPacket);
+        if (deviceTool == null || deviceTool.isClosed()) deviceTool = new DeviceTool(mainHandler, controlPacket);
         deviceTool.handle(data);
       }
     }

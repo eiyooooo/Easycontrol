@@ -48,13 +48,14 @@ public class ControlPacket {
   public static final int DEVICE_KEY = 405;
   public static final int DEVICE_ROTATE = 406;
   public static final int DEVICE_LIGHT = 407;
-  public static final int DEVICE_CHANGE_SIZE = 408;
+  public static final int DEVICE_SCREEN = 408;
+  public static final int DEVICE_CHANGE_SIZE = 409;
 
   public ControlPacket(Stream stream) {
     this.stream = stream;
   }
 
-  public void videoError(String error) throws Exception {
+  public void videoError(int id, String error) throws Exception {
     byte[] tmpTextByte = null;
     if (error != null) {
       tmpTextByte = error.getBytes(StandardCharsets.UTF_8);
@@ -63,25 +64,30 @@ public class ControlPacket {
       }
     }
     int tmpTextByteSize = tmpTextByte == null ? 0 : tmpTextByte.length;
-    ByteBuffer byteBuffer = ByteBuffer.allocate(4 + tmpTextByteSize);
+    ByteBuffer byteBuffer = ByteBuffer.allocate(4 * 2 + tmpTextByteSize);
+    byteBuffer.putInt(id);
     byteBuffer.putInt(VIDEO_ERROR);
     if (tmpTextByte != null) byteBuffer.put(tmpTextByte);
     byteBuffer.flip();
     stream.write(VIDEO_EVENT, byteBuffer);
   }
 
-  public void videoInfo(boolean isHevc, int width, int height) throws Exception {
-    ByteBuffer byteBuffer = ByteBuffer.allocate(4 + 4 * 3);
+  public void videoInfo(int id, boolean supportHevc, int screenWidth, int screenHeight, int videoWidth, int videoHeight) throws Exception {
+    ByteBuffer byteBuffer = ByteBuffer.allocate(4 * 2 + 4 * 5);
+    byteBuffer.putInt(id);
     byteBuffer.putInt(VIDEO_INFO);
-    byteBuffer.putInt(isHevc ? 1 : 0);
-    byteBuffer.putInt(width);
-    byteBuffer.putInt(height);
+    byteBuffer.putInt(supportHevc ? 1 : 0);
+    byteBuffer.putInt(screenWidth);
+    byteBuffer.putInt(screenHeight);
+    byteBuffer.putInt(videoWidth);
+    byteBuffer.putInt(videoHeight);
     byteBuffer.flip();
     stream.write(VIDEO_EVENT, byteBuffer);
   }
 
-  public void videoFrame(long pts, ByteBuffer data) throws Exception {
-    ByteBuffer byteBuffer = ByteBuffer.allocate(4 + 8 + data.remaining());
+  public void videoFrame(int id, long pts, ByteBuffer data) throws Exception {
+    ByteBuffer byteBuffer = ByteBuffer.allocate(4 * 2 + 8 + data.remaining());
+    byteBuffer.putInt(id);
     byteBuffer.putInt(VIDEO_FRAME);
     byteBuffer.putLong(pts);
     byteBuffer.put(data);
@@ -89,7 +95,7 @@ public class ControlPacket {
     stream.write(VIDEO_EVENT, byteBuffer);
   }
 
-  public void audioError(String error) throws Exception {
+  public void audioError(int id, String error) throws Exception {
     byte[] tmpTextByte = null;
     if (error != null) {
       tmpTextByte = error.getBytes(StandardCharsets.UTF_8);
@@ -98,23 +104,26 @@ public class ControlPacket {
       }
     }
     int tmpTextByteSize = tmpTextByte == null ? 0 : tmpTextByte.length;
-    ByteBuffer byteBuffer = ByteBuffer.allocate(4 + tmpTextByteSize);
+    ByteBuffer byteBuffer = ByteBuffer.allocate(4 * 2 + tmpTextByteSize);
+    byteBuffer.putInt(id);
     byteBuffer.putInt(AUDIO_ERROR);
     if (tmpTextByte != null) byteBuffer.put(tmpTextByte);
     byteBuffer.flip();
     stream.write(AUDIO_EVENT, byteBuffer);
   }
 
-  public void audioInfo(boolean isOpus) throws Exception {
-    ByteBuffer byteBuffer = ByteBuffer.allocate(4 + 4);
+  public void audioInfo(int id, boolean isOpus) throws Exception {
+    ByteBuffer byteBuffer = ByteBuffer.allocate(4 * 2 + 4);
+    byteBuffer.putInt(id);
     byteBuffer.putInt(AUDIO_INFO);
     byteBuffer.putInt(isOpus ? 1 : 0);
     byteBuffer.flip();
     stream.write(AUDIO_EVENT, byteBuffer);
   }
 
-  public void audioFrame(ByteBuffer data) throws Exception {
-    ByteBuffer byteBuffer = ByteBuffer.allocate(4 + data.remaining());
+  public void audioFrame(int id, ByteBuffer data) throws Exception {
+    ByteBuffer byteBuffer = ByteBuffer.allocate(4 * 2 + data.remaining());
+    byteBuffer.putInt(id);
     byteBuffer.putInt(AUDIO_FRAME);
     byteBuffer.put(data);
     byteBuffer.flip();

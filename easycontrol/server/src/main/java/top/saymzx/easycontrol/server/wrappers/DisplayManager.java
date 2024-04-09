@@ -14,8 +14,8 @@ import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import top.saymzx.easycontrol.server.tools.DeviceTool;
 import top.saymzx.easycontrol.server.entity.DisplayInfo;
+import top.saymzx.easycontrol.server.tools.DeviceTool;
 import top.saymzx.easycontrol.server.tools.FakeContext;
 
 public final class DisplayManager {
@@ -33,7 +33,7 @@ public final class DisplayManager {
 
   private static DisplayInfo getDisplayInfoFromDumpsysDisplay(int displayId) {
     try {
-      String dumpsysDisplayOutput = DeviceTool.execReadOutput("dumpsys display");
+      String dumpsysDisplayOutput = DeviceManager.execReadOutput("dumpsys display");
       Matcher m = Pattern.compile("mOverrideDisplayInfo=DisplayInfo.*?, displayId " + displayId + ".*?, real ([0-9]+) x ([0-9]+).*?, rotation ([0-9]+).*?, density ([0-9]+).*?, layerStack ([0-9]+)").matcher(dumpsysDisplayOutput);
       if (!m.find()) return null;
       int width = Integer.parseInt(Objects.requireNonNull(m.group(1)));
